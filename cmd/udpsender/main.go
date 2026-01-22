@@ -20,11 +20,11 @@ func main() {
 	}
 	defer func() { _ = conn.Close() }()
 
-	reader := bufio.NewReader(os.Stdin)
+	input := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("> ")
 
-		line, err := reader.ReadString('\n')
+		line, err := input.ReadString('\n')
 		if err != nil {
 			log.Printf("Error: reading input: %v", err)
 		}
