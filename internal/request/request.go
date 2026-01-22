@@ -2,14 +2,17 @@
 package request
 
 import (
+	"bytes"
 	"errors"
 	"io"
+	"log"
 	"strings"
 	"unicode"
 )
 
 type Request struct {
 	RequestLine RequestLine
+	isFinished  bool
 }
 
 type RequestLine struct {
@@ -18,26 +21,89 @@ type RequestLine struct {
 	Method        string
 }
 
+const (
+	crlf       = "\r\n"
+	bufferSize = 8
+)
+
 func RequestFromReader(reader io.Reader) (*Request, error) {
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return &Request{}, err
+	buff := make([]byte, bufferSize)
+	readToIndex := 0
+
+	req := &Request{
+		isFinished: false,
 	}
 
-	parts := strings.Split(string(data), "\r\n")
+	for !req.isFinished {
+		if readToIndex == len(buff) {
+			newBuff := make([]byte, len(buff)*2)
+			_ = copy(newBuff, buff)
+			buff = newBuff
+		}
 
-	requestLine, err := parseRequestLine(parts[0])
-	if err != nil {
-		return &Request{}, err
+		n, err := reader.Read(buff[readToIndex:])
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				req.isFinished = true
+				break
+			} else {
+				return &Request{}, err
+			}
+		}
+
+		readToIndex += n
+
+		consumed, err := req.parse(buff[:readToIndex])
+		if err != nil {
+			return &Request{}, err
+		}
+
+		if consumed > 0 {
+			_ = copy(buff, buff[readToIndex:])
+			readToIndex -= consumed
+		}
 	}
 
-	return &Request{RequestLine: requestLine}, nil
+	return req, nil
 }
 
-func parseRequestLine(line string) (RequestLine, error) {
+func (r *Request) parse(data []byte) (int, error) {
+	if r.isFinished {
+		return 0, errors.New("trying to read data in a done state")
+	}
+
+	n, requestLine, err := parseRequestLine(data)
+	if err != nil {
+		return 0, err
+	} else if n == 0 {
+		return 0, nil
+	}
+
+	r.RequestLine = requestLine
+	r.isFinished = true
+	return n, nil
+}
+
+func parseRequestLine(data []byte) (int, RequestLine, error) {
+	idx := bytes.Index(data, []byte(crlf))
+	if idx == -1 {
+		return 0, RequestLine{}, nil
+	}
+
+	line := string(data[:idx])
+	log.Print(line)
+	requestLine, err := requestLineFromString(line)
+	if err != nil {
+		return 0, RequestLine{}, err
+	}
+
+	return idx + len(crlf), requestLine, nil
+}
+
+func requestLineFromString(line string) (RequestLine, error) {
 	parts := strings.Split(line, " ")
 	if len(parts) != 3 {
-		return RequestLine{}, errors.New("bad request line syntax. Not enough parts")
+		return RequestLine{}, errors.New("bad request-line syntax. Not enough parts")
 	}
 
 	method := parts[0]
@@ -47,11 +113,11 @@ func parseRequestLine(line string) (RequestLine, error) {
 
 	addr := parts[1]
 
-	protocolName := parts[2]
-	if !strings.HasPrefix(protocolName, "HTTP/") {
-		return RequestLine{}, errors.New("protocol name does not begin with HTTP/")
+	protocolName := strings.Split(parts[2], "/")
+	if protocolName[0] != "HTTP" {
+		return RequestLine{}, errors.New("protocol is not HTTP")
 	}
-	if !strings.HasSuffix(protocolName, "1.1") {
+	if protocolName[1] != "1.1" {
 		return RequestLine{}, errors.New("HTTP version does not match 1.1")
 	}
 
