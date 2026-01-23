@@ -14,7 +14,7 @@ func TestParseHeaders(t *testing.T) {
 		n, done, err := headers.Parse(data)
 		require.NoError(t, err)
 		require.NotNil(t, headers)
-		assert.Equal(t, "localhost:42069", headers["Host"])
+		assert.Equal(t, "localhost:42069", headers["host"])
 		assert.Equal(t, len(data)-2, n)
 		assert.False(t, done)
 	})
@@ -25,20 +25,20 @@ func TestParseHeaders(t *testing.T) {
 		n, done, err := headers.Parse(data)
 		require.NoError(t, err)
 		require.NotNil(t, headers)
-		assert.Equal(t, "localhost:42069", headers["Host"])
+		assert.Equal(t, "localhost:42069", headers["host"])
 		assert.Equal(t, len(data)-2, n)
 		assert.False(t, done)
 	})
 
 	t.Run("Valid new header with existing headers", func(t *testing.T) {
 		headers := NewHeaders()
-		headers["Host"] = "localhost:42069"
+		headers["host"] = "localhost:42069"
 		data := []byte("Content-Type: json \r\n\r\n")
 		n, done, err := headers.Parse(data)
 		require.NoError(t, err)
 		require.NotNil(t, headers)
-		assert.Equal(t, "localhost:42069", headers["Host"])
-		assert.Equal(t, "json", headers["Content-Type"])
+		assert.Equal(t, "localhost:42069", headers["host"])
+		assert.Equal(t, "json", headers["content-type"])
 		assert.Equal(t, len(data)-2, n)
 		assert.False(t, done)
 	})
@@ -53,9 +53,41 @@ func TestParseHeaders(t *testing.T) {
 		assert.True(t, done)
 	})
 
+	t.Run("Valid uppercase header converted to lower", func(t *testing.T) {
+		headers := NewHeaders()
+		data := []byte("Content-Type: json \r\n\r\n")
+		n, done, err := headers.Parse(data)
+		require.NoError(t, err)
+		require.NotNil(t, headers)
+		assert.Equal(t, "json", headers["content-type"])
+		assert.Equal(t, len(data)-2, n)
+		assert.False(t, done)
+	})
+
+	t.Run("Valid add values to existing header", func(t *testing.T) {
+		headers := NewHeaders()
+		headers["set-person"] = "bailey"
+		data := []byte("Set-Person: testing \r\n\r\n")
+		n, done, err := headers.Parse(data)
+		require.NoError(t, err)
+		require.NotNil(t, headers)
+		assert.Equal(t, "bailey, testing", headers["set-person"])
+		assert.Equal(t, len(data)-2, n)
+		assert.False(t, done)
+	})
+
 	t.Run("Invalid spacing header", func(t *testing.T) {
 		headers := NewHeaders()
 		data := []byte("       Host : localhost:42069       \r\n\r\n")
+		n, done, err := headers.Parse(data)
+		require.Error(t, err)
+		assert.Equal(t, 0, n)
+		assert.False(t, done)
+	})
+
+	t.Run("Invalid char in field name", func(t *testing.T) {
+		headers := NewHeaders()
+		data := []byte("H©st: localhost:42069\r\n\r\n")
 		n, done, err := headers.Parse(data)
 		require.Error(t, err)
 		assert.Equal(t, 0, n)

@@ -22,7 +22,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	headerLine := string(data[:idx])
-	key, value, found := strings.Cut(headerLine, ":")
+	key, value, found := strings.Cut(strings.TrimSpace(headerLine), ":")
 
 	if !found {
 		return 0, false, errors.New("could not find delimiter : in header line")
@@ -30,13 +30,43 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 	if key[len(key)-1] == ' ' {
 		return 0, false, errors.New("cannot have space between key and colon")
+	} else if !isValidFieldName(key) {
+		return 0, false, errors.New("invalid field name. Did not pass valid field name checks")
 	}
 
-	h[strings.TrimSpace(key)] = strings.TrimSpace(value)
-
+	if existingValue, ok := h[strings.ToLower(key)]; ok {
+		combinedValue := existingValue + ", " + strings.TrimSpace(value)
+		h[strings.ToLower(key)] = combinedValue
+	} else {
+		h[strings.ToLower(key)] = strings.TrimSpace(value)
+	}
 	return idx + len(crlf), false, nil
 }
 
 func NewHeaders() Headers {
 	return make(Headers)
+}
+
+func isValidFieldName(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+
+		switch {
+		case c >= 'A' && c <= 'Z':
+		case c >= 'a' && c <= 'z':
+		case c >= '0' && c <= '9':
+		case c == '!' || c == '#' || c == '$' || c == '%' ||
+			c == '&' || c == '\'' || c == '*' || c == '+' ||
+			c == '-' || c == '.' || c == '^' || c == '_' ||
+			c == '`' || c == '|' || c == '~':
+		default:
+			return false
+		}
+	}
+
+	return true
 }
