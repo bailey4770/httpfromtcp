@@ -12,6 +12,10 @@ const crlf = "\r\n"
 
 type Headers map[string]string
 
+func NewHeaders() Headers {
+	return make(Headers)
+}
+
 func (h Headers) Get(key string) (string, bool) {
 	cleaned := strings.TrimSpace(strings.ToLower(key))
 
@@ -26,6 +30,10 @@ func (h Headers) Set(key, value string) {
 	} else {
 		h[strings.ToLower(key)] = strings.TrimSpace(value)
 	}
+}
+
+func (h Headers) Override(key, value string) {
+	h[strings.ToLower(key)] = strings.TrimSpace(value)
 }
 
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
@@ -53,10 +61,6 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 	h.Set(key, value)
 	return idx + len(crlf), false, nil
-}
-
-func NewHeaders() Headers {
-	return make(Headers)
 }
 
 func isValidFieldName(s string) bool {

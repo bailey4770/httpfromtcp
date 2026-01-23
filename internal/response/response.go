@@ -3,11 +3,16 @@ package response
 
 import (
 	"fmt"
-	"io"
+	"log"
+	"net"
 	"strconv"
 
 	"github.com/bailey4770/httpfromtcp/internal/headers"
 )
+
+type Writer struct {
+	Conn net.Conn
+}
 
 type StatusCode int
 
@@ -17,54 +22,60 @@ const (
 	StatusInternalServerError StatusCode = 500
 )
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+func (w *Writer) writeStatusLine(statusCode StatusCode) error {
 	switch statusCode {
 	case 200:
-		_, err := w.Write([]byte("HTTP/1.1 200 OK\r\n"))
-		if err != nil {
-			return err
-		}
+		_, err := w.Conn.Write([]byte("HTTP/1.1 200 OK\r\n"))
+		return err
 	case 400:
-		_, err := w.Write([]byte("HTTP/1.1 400 Bad Request\r\n"))
-		if err != nil {
-			return err
-		}
+		_, err := w.Conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n"))
+		return err
 	case 500:
-		_, err := w.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n"))
-		if err != nil {
-			return err
-		}
+		_, err := w.Conn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n"))
+		return err
 	default:
 		msg := fmt.Sprintf("HTTP/1.1 %d \r\n", statusCode)
-		_, err := w.Write([]byte(msg))
-		if err != nil {
+		_, err := w.Conn.Write([]byte(msg))
+		return err
+	}
+}
+
+func (w *Writer) writeHeaders(headers headers.Headers) error {
+	for key, value := range headers {
+		header := key + ": " + value + "\r\n"
+		if _, err := w.Conn.Write([]byte(header)); err != nil {
 			return err
 		}
 	}
-	return nil
+
+	_, err := w.Conn.Write([]byte("\r\n"))
+	return err
 }
 
-func GetDefaultHeaders(contentLen int) headers.Headers {
+func (w *Writer) writeBody(body string) error {
+	_, err := w.Conn.Write([]byte(body))
+	return err
+}
+
+func GetDefaultHeaders() headers.Headers {
 	headers := headers.NewHeaders()
 
-	headers.Set("Content-Length", strconv.Itoa(contentLen))
 	headers.Set("Connection", "close")
 	headers.Set("Content-Type", "text/plain")
 
 	return headers
 }
 
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
-	for key, value := range headers {
-		header := key + ": " + value + "\r\n"
-		if _, err := w.Write([]byte(header)); err != nil {
-			return err
-		}
-	}
+func Write(w *Writer, statusCode StatusCode, headers headers.Headers, body string) {
+	headers.Set("Content-Length", strconv.Itoa(len(body)))
 
-	if _, err := w.Write([]byte("\r\n")); err != nil {
-		return err
+	if err := w.writeStatusLine(statusCode); err != nil {
+		log.Printf("Error: could not write error status line to writer: %v", err)
 	}
-
-	return nil
+	if err := w.writeHeaders(headers); err != nil {
+		log.Printf("Error: could not write error headers to writer: %v", err)
+	}
+	if err := w.writeBody(body); err != nil {
+		log.Printf("Error: could not write error body to writer: %v", err)
+	}
 }

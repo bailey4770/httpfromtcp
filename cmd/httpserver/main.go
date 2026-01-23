@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -28,29 +27,47 @@ func main() {
 	log.Println("Server gracefully stopped")
 }
 
-func testHandler(w io.Writer, req *request.Request) *server.HandlerError {
+func testHandler(w *response.Writer, req *request.Request) {
+	headers := response.GetDefaultHeaders()
+	headers.Override("Content-Type", "text/html")
+
 	if req.RequestLine.RequestTarget == "/yourproblem" {
-		return &server.HandlerError{
-			StatusCode: response.StatusBadRequest,
-			ErrorBody:  "Your problem is not my problem\n",
-		}
+		msg := `<html>
+  <head>
+    <title>400 Bad Request</title>
+  </head>
+  <body>
+    <h1>Bad Request</h1>
+    <p>Your request honestly kinda sucked.</p>
+  </body>
+</html>`
+		response.Write(w, response.StatusBadRequest, headers, msg)
+		return
 	}
 
 	if req.RequestLine.RequestTarget == "/myproblem" {
-		return &server.HandlerError{
-			StatusCode: response.StatusInternalServerError,
-			ErrorBody:  "Woopsie, my bad\n",
-		}
+		msg := `<html>
+  <head>
+    <title>500 Internal Server Error</title>
+  </head>
+  <body>
+    <h1>Internal Server Error</h1>
+    <p>Okay, you know what? This one is on me.</p>
+  </body>
+</html>`
+		response.Write(w, response.StatusInternalServerError, headers, msg)
+		return
 	}
 
-	successMsg := "All good, frfr\n"
+	msg := `<html>
+  <head>
+    <title>200 OK</title>
+  </head>
+  <body>
+    <h1>Success!</h1>
+    <p>Your request was an absolute banger.</p>
+  </body>
+</html>`
 
-	if _, err := w.Write([]byte(successMsg)); err != nil {
-		return &server.HandlerError{
-			StatusCode: response.StatusInternalServerError,
-			ErrorBody:  "Could not write to writer\n",
-		}
-	}
-
-	return nil
+	response.Write(w, response.StatusOK, headers, msg)
 }
