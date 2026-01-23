@@ -4,6 +4,7 @@ package headers
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -31,7 +32,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	if key[len(key)-1] == ' ' {
 		return 0, false, errors.New("cannot have space between key and colon")
 	} else if !isValidFieldName(key) {
-		return 0, false, errors.New("invalid field name. Did not pass valid field name checks")
+		return 0, false, fmt.Errorf("invalid field name. %s does not pass valid field name checks", key)
 	}
 
 	if existingValue, ok := h[strings.ToLower(key)]; ok {

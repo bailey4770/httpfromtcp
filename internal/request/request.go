@@ -7,11 +7,23 @@ import (
 	"io"
 	"strings"
 	"unicode"
+
+	"github.com/bailey4770/httpfromtcp/internal/headers"
+)
+
+type requestState int
+
+const (
+	parsingRequestLine requestState = iota
+	parsingHeaders
+	parsingBody
+	doneParsing
 )
 
 type Request struct {
 	RequestLine RequestLine
-	isFinished  bool
+	Headers     headers.Headers
+	state       requestState
 }
 
 type RequestLine struct {
@@ -30,10 +42,11 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	readToIndex := 0
 
 	req := &Request{
-		isFinished: false,
+		Headers: headers.NewHeaders(),
+		state:   parsingRequestLine,
 	}
 
-	for !req.isFinished {
+	for {
 		if readToIndex == len(buff) {
 			newBuff := make([]byte, len(buff)*2)
 			_ = copy(newBuff, buff)
@@ -43,7 +56,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		n, err := reader.Read(buff[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				req.isFinished = true
+				req.state = doneParsing
 				break
 			} else {
 				return &Request{}, err
@@ -52,22 +65,38 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 		readToIndex += n
 
-		consumed, err := req.parse(buff[:readToIndex])
-		if err != nil {
-			return &Request{}, err
+		var consumed int
+
+		switch req.state {
+		case parsingRequestLine:
+			consumed, err = req.parse(buff[:readToIndex])
+			if err != nil {
+				return &Request{}, err
+			}
+
+		case parsingHeaders:
+			var done bool
+
+			consumed, done, err = req.Headers.Parse(buff[:readToIndex])
+			if err != nil {
+				return &Request{}, err
+			} else if done {
+				req.state = parsingBody
+			}
 		}
 
 		if consumed > 0 {
-			_ = copy(buff, buff[readToIndex:])
+			copy(buff, buff[consumed:readToIndex])
 			readToIndex -= consumed
 		}
+
 	}
 
 	return req, nil
 }
 
 func (r *Request) parse(data []byte) (int, error) {
-	if r.isFinished {
+	if r.state != parsingRequestLine {
 		return 0, errors.New("trying to read data in a done state")
 	}
 
@@ -79,7 +108,7 @@ func (r *Request) parse(data []byte) (int, error) {
 	}
 
 	r.RequestLine = requestLine
-	r.isFinished = true
+	r.state = parsingHeaders
 	return n, nil
 }
 
