@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"log"
 	"strings"
 	"unicode"
 )
@@ -91,7 +90,6 @@ func parseRequestLine(data []byte) (int, RequestLine, error) {
 	}
 
 	line := string(data[:idx])
-	log.Print(line)
 	requestLine, err := requestLineFromString(line)
 	if err != nil {
 		return 0, RequestLine{}, err

@@ -1,12 +1,11 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"strings"
+
+	"github.com/bailey4770/httpfromtcp/internal/request"
 )
 
 func main() {
@@ -20,46 +19,16 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error: could not accept connection: %v", err)
 		}
-
 		log.Print("Connection accepted")
-		messages := getLinesChannel(conn)
-		for msg := range messages {
-			fmt.Println(msg)
+
+		req, err := request.RequestFromReader(conn)
+		if err != nil {
+			log.Fatalf("Error: could not get HTTP request from conn: %v", err)
 		}
+
+		fmt.Println("Request line:")
+		fmt.Printf("- Method: %v\n", req.RequestLine.Method)
+		fmt.Printf("- Target: %v\n", req.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %v\n", req.RequestLine.HTTPVersion)
 	}
-}
-
-func getLinesChannel(file io.ReadCloser) <-chan string {
-	messages := make(chan string)
-
-	go func() {
-		var currentLine string
-
-		for {
-			b := make([]byte, 8)
-
-			n, err := file.Read(b)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					if currentLine != "" {
-						messages <- currentLine
-					}
-					close(messages)
-					_ = file.Close()
-					return
-				}
-				log.Fatalf("Error: reading from file: %v", err)
-			}
-
-			parts := strings.Split(string(b[:n]), "\n")
-			for _, part := range parts[:len(parts)-1] {
-				currentLine += part
-				messages <- currentLine
-				currentLine = ""
-			}
-			currentLine += parts[len(parts)-1]
-		}
-	}()
-
-	return messages
 }
