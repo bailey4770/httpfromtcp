@@ -19,6 +19,15 @@ func (h Headers) Get(key string) (string, bool) {
 	return val, ok
 }
 
+func (h Headers) Set(key, value string) {
+	if existingValue, ok := h.Get(key); ok {
+		combinedValue := existingValue + ", " + strings.TrimSpace(value)
+		h[strings.ToLower(key)] = combinedValue
+	} else {
+		h[strings.ToLower(key)] = strings.TrimSpace(value)
+	}
+}
+
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	idx := bytes.Index(data, []byte(crlf))
 
@@ -42,12 +51,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, fmt.Errorf("invalid field name. %s does not pass valid field name checks", key)
 	}
 
-	if existingValue, ok := h[strings.ToLower(key)]; ok {
-		combinedValue := existingValue + ", " + strings.TrimSpace(value)
-		h[strings.ToLower(key)] = combinedValue
-	} else {
-		h[strings.ToLower(key)] = strings.TrimSpace(value)
-	}
+	h.Set(key, value)
 	return idx + len(crlf), false, nil
 }
 
