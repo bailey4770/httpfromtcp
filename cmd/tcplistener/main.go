@@ -13,6 +13,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error: could not create listener: %v", err)
 	}
+	defer func() { _ = listener.Close() }()
 
 	for {
 		conn, err := listener.Accept()
