@@ -12,6 +12,13 @@ const crlf = "\r\n"
 
 type Headers map[string]string
 
+func (h Headers) Get(key string) (string, bool) {
+	cleaned := strings.TrimSpace(strings.ToLower(key))
+
+	val, ok := h[cleaned]
+	return val, ok
+}
+
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	idx := bytes.Index(data, []byte(crlf))
 
