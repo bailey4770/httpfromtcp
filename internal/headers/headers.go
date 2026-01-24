@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/textproto"
 	"strings"
 )
 
@@ -30,6 +31,16 @@ func (h Headers) Set(key, value string) {
 	} else {
 		h[strings.ToLower(key)] = strings.TrimSpace(value)
 	}
+}
+
+func (h Headers) SetTrailers(values ...string) {
+	for _, v := range values {
+		h.Set("trailer", v)
+	}
+}
+
+func CanonicalHeaderKey(k string) string {
+	return textproto.CanonicalMIMEHeaderKey(k)
 }
 
 func (h Headers) Override(key, value string) {

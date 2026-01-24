@@ -1,10 +1,13 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/bailey4770/httpfromtcp/internal/headers"
@@ -72,17 +75,19 @@ func chunkedHandler(w *response.Writer, req *request.Request) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	headers := headers.NewHeaders()
+	respHeaders := headers.NewHeaders()
 	for k, v := range resp.Header.Clone() {
 		for _, i := range v {
-			headers.Set(k, i)
+			respHeaders.Set(k, i)
 		}
 	}
 
-	headers.Remove("Content-Length")
-	headers.Override("Transfer-Encoding", "chunked")
+	respHeaders.Remove("Content-Length")
+	respHeaders.Override("Transfer-Encoding", "chunked")
+	respHeaders.SetTrailers("X-Content-Sha256", "X-Content-Length")
 
-	response.StartStream(w, response.StatusCode(resp.StatusCode), headers)
+	response.StartStream(w, response.StatusCode(resp.StatusCode), respHeaders)
+	var fullBody []byte
 
 	const bufferSize = 1024
 	buf := make([]byte, bufferSize)
@@ -91,6 +96,7 @@ func chunkedHandler(w *response.Writer, req *request.Request) {
 		numBytesRead, err := resp.Body.Read(buf)
 		log.Printf("Read %d from reponse body with error: %v", numBytesRead, err)
 		if numBytesRead > 0 {
+			fullBody = append(fullBody, buf[:numBytesRead]...)
 			if _, err := w.WriteChunkedBody(buf[:numBytesRead]); err != nil {
 				log.Printf("Error: could not write chunked body response: %v", err)
 				return
@@ -104,10 +110,19 @@ func chunkedHandler(w *response.Writer, req *request.Request) {
 					return
 				}
 				log.Print("Finished Streaming")
-				return
+				break
 			}
 			log.Printf("Error: could not read from response body: %v", err)
 			return
 		}
+	}
+
+	checksum := sha256.Sum256(fullBody)
+
+	trailers := headers.NewHeaders()
+	trailers.Set("X-Content-SHA256", hex.EncodeToString(checksum[:]))
+	trailers.Set("X-Content-Length", strconv.Itoa(len(fullBody)))
+	if err := w.WriteTrailers(trailers); err != nil {
+		log.Printf("Error: could not writer trailers: %v", err)
 	}
 }

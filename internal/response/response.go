@@ -71,7 +71,7 @@ func (w *Writer) WriteChunkedBody(chunk []byte) (int, error) {
 }
 
 func (w *Writer) WriteChunkedBodyDone() (int, error) {
-	n, err := w.writeBody([]byte("0\r\n\r\n"))
+	n, err := w.writeBody([]byte("0\r\n"))
 	if err != nil {
 		return 0, err
 	}
@@ -105,9 +105,10 @@ func (w *Writer) writeStatusLine(statusCode StatusCode) error {
 	}
 }
 
-func (w *Writer) writeHeaders(headers headers.Headers) error {
-	for key, value := range headers {
-		header := key + ": " + value + "\r\n"
+func (w *Writer) writeHeaders(h headers.Headers) error {
+	for key, value := range h {
+		cononicalKey := headers.CanonicalHeaderKey(key)
+		header := cononicalKey + ": " + value + "\r\n"
 		if _, err := w.Conn.Write([]byte(header)); err != nil {
 			return err
 		}
@@ -120,4 +121,8 @@ func (w *Writer) writeHeaders(headers headers.Headers) error {
 func (w *Writer) writeBody(body []byte) (int, error) {
 	n, err := w.Conn.Write([]byte(body))
 	return n, err
+}
+
+func (w *Writer) WriteTrailers(h headers.Headers) error {
+	return w.writeHeaders(h)
 }
