@@ -36,6 +36,10 @@ func (h Headers) Override(key, value string) {
 	h[strings.ToLower(key)] = strings.TrimSpace(value)
 }
 
+func (h Headers) Remove(key string) {
+	delete(h, strings.ToLower(key))
+}
+
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	idx := bytes.Index(data, []byte(crlf))
 

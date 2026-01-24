@@ -64,11 +64,10 @@ func (s *Server) handle(conn net.Conn) {
 	req, err := request.RequestFromReader(conn)
 	if err != nil {
 		headers := response.GetDefaultHeaders()
-		response.Write(w, response.StatusBadRequest, headers, err.Error())
+		response.Write(w, response.StatusBadRequest, headers, []byte(err.Error()))
 		return
 	}
 
 	s.handler(w, req)
-
 	log.Print("Successfuly wrote response and closed connection")
 }
