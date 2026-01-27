@@ -11,7 +11,7 @@ import (
 	"github.com/bailey4770/httpfromtcp/internal/server"
 )
 
-const port = 42069
+const port = 8080
 
 func main() {
 	server, err := server.Serve(port, router)
