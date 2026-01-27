@@ -4,15 +4,17 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
+	"github.com/bailey4770/httpfromtcp/internal/request"
 	"github.com/bailey4770/httpfromtcp/internal/server"
 )
 
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, chunkedHandler)
+	server, err := server.Serve(port, router)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -23,4 +25,24 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 	log.Println("Server gracefully stopped")
+}
+
+func router(req *request.Request) server.Handler {
+	if req.RequestLine.RequestTarget == "/yourproblem" {
+		return yourProblemHandler
+	}
+
+	if req.RequestLine.RequestTarget == "/myproblem" {
+		return myProblemHandler
+	}
+
+	if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
+		return chunkedHandler
+	}
+
+	if req.RequestLine.RequestTarget == "/video" {
+		return videoHandler
+	}
+
+	return defaultHandler
 }

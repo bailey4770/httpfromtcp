@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -15,12 +16,11 @@ import (
 	"github.com/bailey4770/httpfromtcp/internal/response"
 )
 
-func testHandler(w *response.Writer, req *request.Request) {
+func yourProblemHandler(w *response.Writer, req *request.Request) {
 	headers := response.GetDefaultHeaders()
 	headers.Override("Content-Type", "text/html")
 
-	if req.RequestLine.RequestTarget == "/yourproblem" {
-		msg := `<html>
+	msg := `<html>
   <head>
     <title>400 Bad Request</title>
   </head>
@@ -29,12 +29,13 @@ func testHandler(w *response.Writer, req *request.Request) {
     <p>Your request honestly kinda sucked.</p>
   </body>
 </html>`
-		response.Write(w, response.StatusBadRequest, headers, []byte(msg))
-		return
-	}
+	response.Write(w, response.StatusBadRequest, headers, []byte(msg))
+}
 
-	if req.RequestLine.RequestTarget == "/myproblem" {
-		msg := `<html>
+func myProblemHandler(w *response.Writer, req *request.Request) {
+	headers := response.GetDefaultHeaders()
+	headers.Override("Content-Type", "text/html")
+	msg := `<html>
   <head>
     <title>500 Internal Server Error</title>
   </head>
@@ -43,9 +44,12 @@ func testHandler(w *response.Writer, req *request.Request) {
     <p>Okay, you know what? This one is on me.</p>
   </body>
 </html>`
-		response.Write(w, response.StatusInternalServerError, headers, []byte(msg))
-		return
-	}
+	response.Write(w, response.StatusInternalServerError, headers, []byte(msg))
+}
+
+func defaultHandler(w *response.Writer, req *request.Request) {
+	headers := response.GetDefaultHeaders()
+	headers.Override("Content-Type", "text/html")
 
 	msg := `<html>
   <head>
@@ -61,10 +65,6 @@ func testHandler(w *response.Writer, req *request.Request) {
 }
 
 func chunkedHandler(w *response.Writer, req *request.Request) {
-	if !strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin") {
-		return
-	}
-
 	subdomain := strings.TrimPrefix(req.RequestLine.RequestTarget, "/httpbin")
 	url := "https://httpbin.org" + subdomain
 
@@ -125,4 +125,16 @@ func chunkedHandler(w *response.Writer, req *request.Request) {
 	if err := w.WriteTrailers(trailers); err != nil {
 		log.Printf("Error: could not writer trailers: %v", err)
 	}
+}
+
+func videoHandler(w *response.Writer, req *request.Request) {
+	data, err := os.ReadFile("./assets/vim.mp4")
+	if err != nil {
+		log.Printf("Error: could not read video file: %v", err)
+	}
+
+	headers := response.GetDefaultHeaders()
+	headers.Override("content-type", "video/mp4")
+
+	response.Write(w, response.StatusOK, headers, data)
 }

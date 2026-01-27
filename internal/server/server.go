@@ -10,15 +10,18 @@ import (
 	"github.com/bailey4770/httpfromtcp/internal/response"
 )
 
-type Handler func(w *response.Writer, req *request.Request)
+type (
+	Router  func(req *request.Request) Handler
+	Handler func(w *response.Writer, req *request.Request)
+)
 
 type Server struct {
 	listener net.Listener
 	isClosed atomic.Bool
-	handler  Handler
+	router   Router
 }
 
-func Serve(port int, handler Handler) (*Server, error) {
+func Serve(port int, router Router) (*Server, error) {
 	listener, err := net.Listen("tcp", ":42069")
 	if err != nil {
 		return nil, err
@@ -27,7 +30,7 @@ func Serve(port int, handler Handler) (*Server, error) {
 	server := &Server{
 		listener: listener,
 		isClosed: atomic.Bool{},
-		handler:  handler,
+		router:   router,
 	}
 	server.isClosed.Store(false)
 
@@ -68,6 +71,8 @@ func (s *Server) handle(conn net.Conn) {
 		return
 	}
 
-	s.handler(w, req)
+	handler := s.router(req)
+	handler(w, req)
+
 	log.Print("Successfuly wrote response and closed connection")
 }
